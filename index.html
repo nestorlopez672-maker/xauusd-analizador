@@ -1,119 +1,33 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Analizador XAUUSD</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XAUUSD Analyzer 2.0</title>
 <style>
-body{background:#0b1220;color:white;font-family:Arial,sans-serif;margin:0;padding:20px}
-main{max-width:600px;margin:auto}
-h1{color:#facc15}
-.card{background:#172238;padding:18px;border-radius:14px;margin:14px 0}
-button,input,select{padding:12px;border:0;border-radius:8px;font-size:16px}
-button{background:#facc15;color:#111827;font-weight:bold;cursor:pointer;width:100%}
-input{width:100%;box-sizing:border-box;margin:8px 0;background:#fff}
-select{width:100%;margin:8px 0}
-small{color:#aebbd0}
-#resultado{white-space:pre-wrap;line-height:1.7}
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b1220;color:#f3f6fc;font:16px system-ui,Arial,sans-serif;padding:18px}main{max-width:760px;margin:auto}h1{color:#facc15;font-size:clamp(24px,6vw,36px);margin-bottom:8px}p{line-height:1.5}.card{background:#19243a;border:1px solid #33415d;padding:18px;border-radius:16px;margin:16px 0}label{display:block;margin:12px 0 6px}input,button{width:100%;border-radius:9px;padding:13px;font-size:16px}input{border:1px solid #64748b;background:#fff;color:#111}button{border:0;background:#facc15;color:#111827;font-weight:750;margin-top:14px}button:disabled{opacity:.55}small,.muted{color:#b7c4d9}.warn{color:#ffcf70}.good{color:#86efac}.bad{color:#fda4af}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.stat{background:#111b2e;border-radius:10px;padding:12px;overflow-wrap:anywhere}.stat b{display:block;font-size:19px;margin-top:5px}#chart{width:100%;height:210px;background:#111b2e;border-radius:10px}#status{white-space:pre-wrap;line-height:1.5}h2{font-size:20px}h3{margin:16px 0 8px}a{color:#fde68a}@media(max-width:430px){.grid{grid-template-columns:1fr 1fr}.card{padding:14px}}
 </style>
 </head>
-<body>
-<main>
-<h1>🥇 XAUUSD Analyzer</h1>
-<p>Análisis técnico del oro para práctica en demo.</p>
-<div class="card">
-<label>Clave API de Twelve Data</label>
-<input id="api" type="password" placeholder="Introduce tu clave">
-<small>La clave se usa solo en esta sesión. No se guarda.</small>
-<p>Temporalidad</p>
-<select id="tf">
-<option value="5min">M5 - 5 minutos</option>
-<option value="15min">M15 - 15 minutos</option>
-</select>
-<button onclick="analizar()">Analizar XAUUSD</button>
-</div>
-<div class="card" id="resultado">
-Esperando análisis...
-</div>
-<small>Datos orientativos. No garantiza ganancias ni ejecuta operaciones.</small>
-</main>
-<script>
+<body><main>
+<h1>🥇 XAUUSD Analyzer 2.0</h1>
+<p class="muted">Análisis educativo de oro con velas de Twelve Data. No está conectado a órdenes de Exness o MT5.</p>
+<section class="card">
+<label for="api">Clave API de Twelve Data</label><input id="api" type="password" autocomplete="off" placeholder="Introduce tu clave privada">
+<small>La clave no se guarda en el dispositivo ni en GitHub. Se envía a Twelve Data al consultar; para protegerla mejor en una web pública hace falta un servidor intermediario.</small>
+<button id="run">Analizar M5 y M15</button>
+</section>
+<section class="card"><h2>Estado de los datos</h2><div id="status" aria-live="polite">Esperando consulta…</div></section>
+<section class="card" id="results" hidden><h2>Comparación de temporalidades</h2><div id="panels"></div><h2>Conclusión educativa</h2><p id="summary"></p><h2>Gráfico de cierres</h2><p class="muted" id="chartlabel"></p><svg id="chart" viewBox="0 0 600 210" role="img" aria-label="Gráfico de precios de cierre"></svg></section>
+<p class="muted"><small>Los horarios de las velas se solicitan en UTC. El mercado del oro puede estar cerrado los fines de semana. No operar con datos desactualizados. No hay señales garantizadas.</small></p>
+</main><script>
+'use strict';
 const $=id=>document.getElementById(id);
-function ema(a,n){
- const k=2/(n+1);
- let e=a[0];
- return a.map(v=>(e=v*k+e*(1-k)));
-}
-function rsi(a,n=14){
- let gains=0,losses=0;
- for(let i=1;i<=n;i++){
-  let d=a[i]-a[i-1];
-  gains+=Math.max(d,0);
-  losses+=Math.max(-d,0);
- }
- let g=gains/n,l=losses/n;
- for(let i=n+1;i<a.length;i++){
-  let d=a[i]-a[i-1];
-  g=(g*(n-1)+Math.max(d,0))/n;
-  l=(l*(n-1)+Math.max(-d,0))/n;
- }
- return l===0?(g===0?50:100):100-100/(1+g/l);
-}
-async function analizar(){
- const key=$("api").value.trim();
- const out=$("resultado");
- if(!key){out.textContent="Introduce tu clave API.";return;}
- out.textContent="Consultando Twelve Data...";
- try{
-  const params=new URLSearchParams({
-   symbol:"XAU/USD",
-   interval:$("tf").value,
-   outputsize:"120",
-   apikey:key
-  });
-  const res=await fetch(
-   "https://api.twelvedata.com/time_series?"+params
-  );
-  if(!res.ok)throw Error("Error HTTP "+res.status);
-  const data=await res.json();
-  if(data.status==="error"||!data.values)
-   throw Error(data.message||"Datos no disponibles");
-  const candles=data.values.slice().reverse();
-  const closes=candles.map(x=>Number(x.close));
-  const highs=candles.map(x=>Number(x.high));
-  const lows=candles.map(x=>Number(x.low));
-  if(closes.length<50)throw Error("Faltan velas");
-  const e20=ema(closes,20).at(-1);
-  const e50=ema(closes,50).at(-1);
-  const r=rsi(closes);
-  const price=closes.at(-1);
-  const support=Math.min(...lows.slice(-20));
-  const resistance=Math.max(...highs.slice(-20));
-  let trend=e20>e50?"ALCISTA":
-    e20<e50?"BAJISTA":"NEUTRAL";
-  let signal="ESPERAR / SIN CONFIRMACIÓN";
-  if(price>e20&&e20>e50&&r>50&&r<70)
-    signal="SESGO ALCISTA (DEMO)";
-  if(price<e20&&e20<e50&&r<50&&r>30)
-    signal="SESGO BAJISTA (DEMO)";
-  out.textContent=
-   "XAU/USD | "+$("tf").value+"\n"+
-   "Última vela: "+candles.at(-1).datetime+"\n"+
-   "Precio: "+price.toFixed(2)+"\n"+
-   "EMA 20: "+e20.toFixed(2)+"\n"+
-   "EMA 50: "+e50.toFixed(2)+"\n"+
-   "RSI 14: "+r.toFixed(2)+"\n"+
-   "Soporte (20 velas): "+support.toFixed(2)+"\n"+
-   "Resistencia (20 velas): "+resistance.toFixed(2)+"\n"+
-   "Tendencia: "+trend+"\n"+
-   "Lectura: "+signal+"\n\n"+
-   "Verifica el gráfico en MT5 antes de decidir.";
- }catch(e){
-  out.textContent="Error: "+e.message+
-  "\nRevisa el símbolo, plan API, conexión o permisos CORS.";
- }
-}
-</script>
-</body>
-</html>
+const fmt=(n,d=2)=>Number.isFinite(n)?n.toFixed(d):'—';
+function ema(values,period){if(values.length<period)return NaN;let sum=0;for(let i=0;i<period;i++)sum+=values[i];let result=sum/period,k=2/(period+1);for(let i=period;i<values.length;i++)result=(values[i]-result)*k+result;return result}
+function rsi(values,period=14){if(values.length<=period)return NaN;let gain=0,loss=0;for(let i=1;i<=period;i++){let d=values[i]-values[i-1];gain+=Math.max(d,0);loss+=Math.max(-d,0)}gain/=period;loss/=period;for(let i=period+1;i<values.length;i++){let d=values[i]-values[i-1];gain=(gain*(period-1)+Math.max(d,0))/period;loss=(loss*(period-1)+Math.max(-d,0))/period}return loss===0?(gain===0?50:100):100-100/(1+gain/loss)}
+function utcDate(s){if(!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s||''))return NaN;return Date.parse(s.replace(' ','T')+'Z')}
+async function getData(interval,key){const p=new URLSearchParams({symbol:'XAU/USD',interval,outputsize:'120',timezone:'UTC',apikey:key});const r=await fetch('https://api.twelvedata.com/time_series?'+p.toString(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json();if(data.status==='error'||!Array.isArray(data.values))throw Error(data.message||'Respuesta inválida de Twelve Data');const candles=data.values.map(v=>({date:v.datetime,ts:utcDate(v.datetime),close:Number(v.close),high:Number(v.high),low:Number(v.low)})).sort((a,b)=>a.ts-b.ts);if(candles.length<60||candles.some(c=>!Number.isFinite(c.ts)||![c.close,c.high,c.low].every(Number.isFinite)))throw Error('Velas insuficientes o inválidas');const closes=candles.map(c=>c.close),last=candles.at(-1),e20=ema(closes,20),e50=ema(closes,50),r14=rsi(closes);const recent=candles.slice(-20),support=Math.min(...recent.map(c=>c.low)),resistance=Math.max(...recent.map(c=>c.high));const now=Date.now(),minutes=(now-last.ts)/60000,intervalMinutes=interval==='5min'?5:15;const future=minutes< -intervalMinutes-2;const stale=minutes>Math.max(intervalMinutes*3,30);const invalid=future||stale;let bias='Sin confirmación';if(!invalid&&last.close>e20&&e20>e50&&r14>50&&r14<70)bias='Condiciones alcistas para estudiar';if(!invalid&&last.close<e20&&e20<e50&&r14<50&&r14>30)bias='Condiciones bajistas para estudiar';return {interval,candles,last,e20,e50,r14,support,resistance,minutes,future,stale,invalid,bias}}
+function line(label,value){const el=document.createElement('div');el.className='stat';const s=document.createElement('span');s.textContent=label;const b=document.createElement('b');b.textContent=value;el.append(s,b);return el}
+function panel(x){const section=document.createElement('section');const title=document.createElement('h3');title.textContent=x.interval==='5min'?'M5 · 5 minutos':'M15 · 15 minutos';section.append(title);const grid=document.createElement('div');grid.className='grid';[['Precio',fmt(x.last.close)],['EMA 20',fmt(x.e20)],['EMA 50',fmt(x.e50)],['RSI 14',fmt(x.r14)],['Soporte (20 velas)',fmt(x.support)],['Resistencia (20 velas)',fmt(x.resistance)],['Última vela (UTC)',x.last.date],['Estado',x.invalid?'No validado':x.bias]].forEach(([a,b])=>grid.append(line(a,b)));section.append(grid);return section}
+function drawChart(x){const svg=$('chart');svg.replaceChildren();const arr=x.candles.slice(-60).map(c=>c.close),min=Math.min(...arr),max=Math.max(...arr),range=max-min||1;const pts=arr.map((v,i)=>`${20+i*560/(arr.length-1)},${185-(v-min)/range*160}`).join(' ');const ns='http://www.w3.org/2000/svg';const path=document.createElementNS(ns,'polyline');path.setAttribute('points',pts);path.setAttribute('fill','none');path.setAttribute('stroke','#facc15');path.setAttribute('stroke-width','2.5');svg.append(path);$('chartlabel').textContent='Últimos 60 cierres · '+x.interval+' · mínimo '+fmt(min)+' / máximo '+fmt(max)}
+$('run').addEventListener('click',async()=>{const key=$('api').value.trim();if(!key){$('status').textContent='Introduce tu clave API.';return}const button=$('run');button.disabled=true;$('results').hidden=true;$('status').textContent='Consultando M5 y M15…';try{const results=await Promise.allSettled([getData('5min',key),getData('15min',key)]);const ok=results.filter(r=>r.status==='fulfilled').map(r=>r.value);const errors=results.filter(r=>r.status==='rejected').map(r=>r.reason.message);if(!ok.length)throw Error(errors.join(' | '));$('panels').replaceChildren(...ok.map(panel));$('results').hidden=false;const warnings=ok.filter(x=>x.invalid);let status='Consulta realizada. Hora de comprobación (UTC): '+new Date().toISOString()+'\n';if(warnings.length)status+='⚠️ Datos no validados: '+warnings.map(x=>x.interval+(x.future?' fecha futura':' datos atrasados')).join(', ')+'. No interpretar como señal actual.\n';else status+='✓ Fechas dentro de la ventana de frescura configurada (no garantiza exactitud del proveedor).\n';if(errors.length)status+='⚠️ Consulta parcial: '+errors.join(' | ');$('status').textContent=status;const a=ok.find(x=>x.interval==='5min'),b=ok.find(x=>x.interval==='15min');$('summary').textContent=warnings.length||errors.length?'ESPERAR: primero validar la actualidad y consistencia de los datos.':a&&b&&a.bias===b.bias&&a.bias!=='Sin confirmación'?'Ambas temporalidades coinciden en: '+a.bias+'. Es una observación educativa, no una instrucción de operación.':'ESPERAR: no hay confirmación conjunta de M5 y M15.';drawChart(a||b)}catch(e){$('status').textContent='No fue posible completar el análisis: '+e.message+'\nComprueba el plan, cuota, símbolo, permisos del navegador y tu conexión.'}finally{button.disabled=false}});
+</script></body></html>
