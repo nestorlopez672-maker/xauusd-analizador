@@ -1,118 +1,119 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>XAUUSD Analizador</title>
-  <style>
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      padding: 20px;
-      background: #0b1425;
-      color: #ffffff;
-      font-family: Arial, sans-serif;
-    }
-
-    h1 { color: #f5c451; }
-
-    .panel {
-      background: #1b2a42;
-      padding: 22px;
-      border-radius: 15px;
-      margin-top: 20px;
-    }
-
-    .estado { color: #ffcc66; }
-
-    .dato {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 0;
-      border-bottom: 1px solid #36445c;
-    }
-
-    .aviso {
-      color: #aebbd0;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    button {
-      background: #f5c451;
-      color: #0b1425;
-      border: none;
-      padding: 14px;
-      border-radius: 10px;
-      font-weight: bold;
-      width: 100%;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analizador XAUUSD</title>
+<style>
+body{background:#0b1220;color:white;font-family:Arial,sans-serif;margin:0;padding:20px}
+main{max-width:600px;margin:auto}
+h1{color:#facc15}
+.card{background:#172238;padding:18px;border-radius:14px;margin:14px 0}
+button,input,select{padding:12px;border:0;border-radius:8px;font-size:16px}
+button{background:#facc15;color:#111827;font-weight:bold;cursor:pointer;width:100%}
+input{width:100%;box-sizing:border-box;margin:8px 0;background:#fff}
+select{width:100%;margin:8px 0}
+small{color:#aebbd0}
+#resultado{white-space:pre-wrap;line-height:1.7}
+</style>
 </head>
 <body>
-
-  <h1>📈 XAUUSD Analizador</h1>
-  <p>Exness Demo | M5 y M15</p>
-
-  <div class="panel">
-    <h2>Estado del sistema</h2>
-    <p class="estado" id="estado">
-      Esperando conexion
-    </p>
-
-    <div class="dato">
-      <span>Precio</span>
-      <strong>No disponible</strong>
-    </div>
-
-    <div class="dato">
-      <span>EMA 20 / EMA 50</span>
-      <strong>Pendiente</strong>
-    </div>
-
-    <div class="dato">
-      <span>RSI 14</span>
-      <strong>Pendiente</strong>
-    </div>
-
-    <div class="dato">
-      <span>Senal</span>
-      <strong>SIN DATOS</strong>
-    </div>
-  </div>
-
-  <div class="panel">
-    <h2>Historial de analisis</h2>
-    <p>Aun no hay datos registrados.</p>
-  </div>
-
-  <div class="panel">
-    <h2>Conexion de mercado</h2>
-    <p class="aviso">
-      Pendiente de configurar un servidor
-      seguro para consultar Twelve Data.
-      No introduzcas claves API aqui.
-    </p>
-    <button onclick="mostrarEstado()">
-      Comprobar estado
-    </button>
-  </div>
-
-  <p class="aviso">
-    Version inicial educativa.
-    No recibe cotizaciones reales,
-    no genera senales operativas
-    y no ejecuta operaciones.
-  </p>
-
-  <script>
-    function mostrarEstado() {
-      document.getElementById("estado")
-        .textContent = "Conexion pendiente";
-    }
-  </script>
-
+<main>
+<h1>🥇 XAUUSD Analyzer</h1>
+<p>Análisis técnico del oro para práctica en demo.</p>
+<div class="card">
+<label>Clave API de Twelve Data</label>
+<input id="api" type="password" placeholder="Introduce tu clave">
+<small>La clave se usa solo en esta sesión. No se guarda.</small>
+<p>Temporalidad</p>
+<select id="tf">
+<option value="5min">M5 - 5 minutos</option>
+<option value="15min">M15 - 15 minutos</option>
+</select>
+<button onclick="analizar()">Analizar XAUUSD</button>
+</div>
+<div class="card" id="resultado">
+Esperando análisis...
+</div>
+<small>Datos orientativos. No garantiza ganancias ni ejecuta operaciones.</small>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function ema(a,n){
+ const k=2/(n+1);
+ let e=a[0];
+ return a.map(v=>(e=v*k+e*(1-k)));
+}
+function rsi(a,n=14){
+ let gains=0,losses=0;
+ for(let i=1;i<=n;i++){
+  let d=a[i]-a[i-1];
+  gains+=Math.max(d,0);
+  losses+=Math.max(-d,0);
+ }
+ let g=gains/n,l=losses/n;
+ for(let i=n+1;i<a.length;i++){
+  let d=a[i]-a[i-1];
+  g=(g*(n-1)+Math.max(d,0))/n;
+  l=(l*(n-1)+Math.max(-d,0))/n;
+ }
+ return l===0?(g===0?50:100):100-100/(1+g/l);
+}
+async function analizar(){
+ const key=$("api").value.trim();
+ const out=$("resultado");
+ if(!key){out.textContent="Introduce tu clave API.";return;}
+ out.textContent="Consultando Twelve Data...";
+ try{
+  const params=new URLSearchParams({
+   symbol:"XAU/USD",
+   interval:$("tf").value,
+   outputsize:"120",
+   apikey:key
+  });
+  const res=await fetch(
+   "https://api.twelvedata.com/time_series?"+params
+  );
+  if(!res.ok)throw Error("Error HTTP "+res.status);
+  const data=await res.json();
+  if(data.status==="error"||!data.values)
+   throw Error(data.message||"Datos no disponibles");
+  const candles=data.values.slice().reverse();
+  const closes=candles.map(x=>Number(x.close));
+  const highs=candles.map(x=>Number(x.high));
+  const lows=candles.map(x=>Number(x.low));
+  if(closes.length<50)throw Error("Faltan velas");
+  const e20=ema(closes,20).at(-1);
+  const e50=ema(closes,50).at(-1);
+  const r=rsi(closes);
+  const price=closes.at(-1);
+  const support=Math.min(...lows.slice(-20));
+  const resistance=Math.max(...highs.slice(-20));
+  let trend=e20>e50?"ALCISTA":
+    e20<e50?"BAJISTA":"NEUTRAL";
+  let signal="ESPERAR / SIN CONFIRMACIÓN";
+  if(price>e20&&e20>e50&&r>50&&r<70)
+    signal="SESGO ALCISTA (DEMO)";
+  if(price<e20&&e20<e50&&r<50&&r>30)
+    signal="SESGO BAJISTA (DEMO)";
+  out.textContent=
+   "XAU/USD | "+$("tf").value+"\n"+
+   "Última vela: "+candles.at(-1).datetime+"\n"+
+   "Precio: "+price.toFixed(2)+"\n"+
+   "EMA 20: "+e20.toFixed(2)+"\n"+
+   "EMA 50: "+e50.toFixed(2)+"\n"+
+   "RSI 14: "+r.toFixed(2)+"\n"+
+   "Soporte (20 velas): "+support.toFixed(2)+"\n"+
+   "Resistencia (20 velas): "+resistance.toFixed(2)+"\n"+
+   "Tendencia: "+trend+"\n"+
+   "Lectura: "+signal+"\n\n"+
+   "Verifica el gráfico en MT5 antes de decidir.";
+ }catch(e){
+  out.textContent="Error: "+e.message+
+  "\nRevisa el símbolo, plan API, conexión o permisos CORS.";
+ }
+}
+</script>
 </body>
 </html>
