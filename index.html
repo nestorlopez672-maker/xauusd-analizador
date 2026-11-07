@@ -1,43 +1,120 @@
 
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>XAUUSD Analizador</title>
-<style>
-body {
-  background:#0b1425;
-  color:white;
-  font-family:Arial,sans-serif;
-  padding:20px;
-}
-.panel {
-  background:#1b2a42;
-  padding:22px;
-  border-radius:15px;
-  margin-top:20px;
-}
-h1 {color:#f5c451}
-.estado {color:#ffcc66}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>XAUUSD Analizador</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #0b1425;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+    }
+
+    h1 { color: #f5c451; }
+
+    .panel {
+      background: #1b2a42;
+      padding: 22px;
+      border-radius: 15px;
+      margin-top: 20px;
+    }
+
+    .estado { color: #ffcc66; }
+
+    .dato {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #36445c;
+    }
+
+    .aviso {
+      color: #aebbd0;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    button {
+      background: #f5c451;
+      color: #0b1425;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-weight: bold;
+      width: 100%;
+    }
+  </style>
 </head>
 <body>
-<h1>📈 XAUUSD Analizador</h1>
-<p>Exness Demo | M5 y M15</p>
-<div class="panel">
-  <h2>Estado del sistema</h2>
-  <p class="estado">Esperando conexión</p>
-  <p>Precio: No disponible</p>
-  <p>EMA 20 / EMA 50: Pendiente</p>
-  <p>RSI 14: Pendiente</p>
-  <p>Señal: SIN DATOS</p>
-</div>
-<div class="panel">
-  <h2>Historial de análisis</h2>
-  <p>Aún no hay datos registrados.</p>
-</div>
-<p>Modo educativo. No ejecuta operaciones.</p>
+
+  <h1>📈 XAUUSD Analizador</h1>
+  <p>Exness Demo | M5 y M15</p>
+
+  <div class="panel">
+    <h2>Estado del sistema</h2>
+    <p class="estado" id="estado">
+      Esperando conexion
+    </p>
+
+    <div class="dato">
+      <span>Precio</span>
+      <strong>No disponible</strong>
+    </div>
+
+    <div class="dato">
+      <span>EMA 20 / EMA 50</span>
+      <strong>Pendiente</strong>
+    </div>
+
+    <div class="dato">
+      <span>RSI 14</span>
+      <strong>Pendiente</strong>
+    </div>
+
+    <div class="dato">
+      <span>Senal</span>
+      <strong>SIN DATOS</strong>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Historial de analisis</h2>
+    <p>Aun no hay datos registrados.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Conexion de mercado</h2>
+    <p class="aviso">
+      Pendiente de configurar un servidor
+      seguro para consultar Twelve Data.
+      No introduzcas claves API aqui.
+    </p>
+    <button onclick="mostrarEstado()">
+      Comprobar estado
+    </button>
+  </div>
+
+  <p class="aviso">
+    Version inicial educativa.
+    No recibe cotizaciones reales,
+    no genera senales operativas
+    y no ejecuta operaciones.
+  </p>
+
+  <script>
+    function mostrarEstado() {
+      document.getElementById("estado")
+        .textContent = "Conexion pendiente";
+    }
+  </script>
+
 </body>
 </html>
+
