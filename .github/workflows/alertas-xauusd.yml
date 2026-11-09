@@ -5,7 +5,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '*/15 * * * *'
-    
 
 permissions:
   contents: read
@@ -13,8 +12,9 @@ permissions:
 jobs:
   analizar:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Consultar oro y enviar informe
+      - name: Analizar oro y enviar Telegram
         env:
           API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -35,67 +35,123 @@ jobs:
               params = urllib.parse.urlencode({
                   "symbol": "XAU/USD",
                   "interval": intervalo,
-                  "outputsize": 60,
+                  "outputsize": 100,
                   "apikey": api_key
               })
               url = "https://api.twelvedata.com/time_series?" + params
               with urllib.request.urlopen(url, timeout=25) as r:
                   data = json.load(r)
               if data.get("status") == "error":
-                  raise RuntimeError(data.get("message", "Error de API"))
+                  raise RuntimeError(data.get("message", "Error API"))
               velas = data.get("values", [])
-              if len(velas) < 50:
-                  raise RuntimeError("No hay suficientes velas")
-              cierres = [float(v["close"]) for v in reversed(velas)]
-              return cierres
+              if len(velas) < 60:
+                  raise RuntimeError("Datos insuficientes")
+              return list(reversed(velas))
 
           def ema(valores, periodo):
-              promedio = sum(valores[:periodo]) / periodo
+              resultado = sum(valores[:periodo]) / periodo
               k = 2 / (periodo + 1)
-              for valor in valores[periodo:]:
-                  promedio = valor * k + promedio * (1 - k)
-              return promedio
+              for precio in valores[periodo:]:
+                  resultado = precio*k + resultado*(1-k)
+              return resultado
+
+          def rsi(valores, periodo=14):
+              cambios = [
+                  valores[i] - valores[i-1]
+                  for i in range(1, len(valores))
+              ]
+              ganancias = [max(x, 0) for x in cambios]
+              perdidas = [max(-x, 0) for x in cambios]
+              g = sum(ganancias[:periodo]) / periodo
+              p = sum(perdidas[:periodo]) / periodo
+              for i in range(periodo, len(cambios)):
+                  g = (g*(periodo-1)+ganancias[i])/periodo
+                  p = (p*(periodo-1)+perdidas[i])/periodo
+              if p == 0:
+                  return 100.0 if g > 0 else 50.0
+              return 100 - 100/(1+g/p)
 
           def analizar(intervalo):
-              cierres = consultar(intervalo)
+              velas = consultar(intervalo)
+              cierres = [float(v["close"]) for v in velas]
+              precio = cierres[-1]
               e20 = ema(cierres, 20)
               e50 = ema(cierres, 50)
-              precio = cierres[-1]
-              if precio > e20 > e50:
-                  tendencia = "Alcista"
-              elif precio < e20 < e50:
-                  tendencia = "Bajista"
-              else:
-                  tendencia = "Mixta"
-              return precio, tendencia, e20, e50
+              fuerza = rsi(cierres)
+              anteriores = velas[-21:-1]
+              soporte = min(float(v["low"]) for v in anteriores)
+              resistencia = max(float(v["high"]) for v in anteriores)
 
-          mensajes = ["MONITOR XAUUSD - PRUEBA"]
-          mensajes.append("Hora UTC: " + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"))
+              if precio > e20 > e50 and fuerza > 50:
+                  tendencia = "ALCISTA"
+              elif precio < e20 < e50 and fuerza < 50:
+                  tendencia = "BAJISTA"
+              else:
+                  tendencia = "MIXTA"
+
+              return {
+                  "precio": precio,
+                  "ema20": e20,
+                  "ema50": e50,
+                  "rsi": fuerza,
+                  "soporte": soporte,
+                  "resistencia": resistencia,
+                  "tendencia": tendencia
+              }
+
+          informes = []
+          tendencias = {}
 
           for intervalo in ["5min", "15min"]:
               try:
-                  precio, tendencia, e20, e50 = analizar(intervalo)
-                  mensajes.append(
-                      f"{intervalo}: {tendencia}\n"
-                      f"Precio: {precio:.2f}\n"
-                      f"EMA20: {e20:.2f} | EMA50: {e50:.2f}"
+                  a = analizar(intervalo)
+                  tendencias[intervalo] = a["tendencia"]
+                  informes.append(
+                      f"{intervalo}: {a['tendencia']}\n"
+                      f"Precio: {a['precio']:.2f}\n"
+                      f"EMA20: {a['ema20']:.2f}\n"
+                      f"EMA50: {a['ema50']:.2f}\n"
+                      f"RSI14: {a['rsi']:.1f}\n"
+                      f"Soporte: {a['soporte']:.2f}\n"
+                      f"Resistencia: {a['resistencia']:.2f}"
                   )
               except Exception as e:
-                  mensajes.append(f"{intervalo}: sin datos - {str(e)[:160]}")
+                  tendencias[intervalo] = "SIN DATOS"
+                  informes.append(
+                      f"{intervalo}: sin datos ({str(e)[:100]})"
+                  )
 
-          mensajes.append("Informe educativo. No es una señal de entrada.")
-          texto = "\n\n".join(mensajes)
+          m5 = tendencias["5min"]
+          m15 = tendencias["15min"]
+
+          if m5 == m15 and m5 in ("ALCISTA", "BAJISTA"):
+              alerta = f"ALERTA DE VIGILANCIA: ambas tendencias {m5}"
+          else:
+              alerta = "Sin coincidencia alcista/bajista confirmada"
+
+          hora = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+          mensaje = (
+              "MONITOR XAUUSD\n"
+              f"Hora: {hora}\n\n"
+              + "\n\n".join(informes)
+              + f"\n\n{alerta}"
+              + "\n\nInforme educativo. No es una orden de trading."
+          )
 
           url = f"https://api.telegram.org/bot{token}/sendMessage"
           payload = urllib.parse.urlencode({
               "chat_id": chat_id,
-              "text": texto
+              "text": mensaje
           }).encode()
 
-          req = urllib.request.Request(url, data=payload)
-          with urllib.request.urlopen(req, timeout=25) as r:
+          with urllib.request.urlopen(
+              urllib.request.Request(url, data=payload),
+              timeout=25
+          ) as r:
               respuesta = json.load(r)
-          if not respuesta.get("ok"):
-              raise RuntimeError("Telegram no confirmó el envío")
+              if not respuesta.get("ok"):
+                  raise RuntimeError("Telegram no confirmó el envío")
+
           print("Informe enviado correctamente")
           PY
+          
