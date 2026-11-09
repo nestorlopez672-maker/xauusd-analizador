@@ -1,7 +1,7 @@
-k
+
           
 
-name: Alertas XAUUSD
+name:Alertas XAUUSD
 
 on:
   workflow_dispatch:
