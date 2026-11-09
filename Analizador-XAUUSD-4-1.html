@@ -22,14 +22,23 @@ try {
 }
 
 if (apiInput) {
-  apiInput.addEventListener('change', () => {
+  const guardarClave = () => {
     try {
-      localStorage.setItem(apiStorageKey, apiInput.value.trim());
+      localStorage.setItem(
+        apiStorageKey,
+        apiInput.value.trim()
+      );
     } catch (e) {
       console.warn('No se pudo guardar la clave');
     }
-  });
+  };
+
+  apiInput.addEventListener('input', guardarClave);
+  apiInput.addEventListener('change', guardarClave);
+  document.getElementById('go')
+    ?.addEventListener('click', guardarClave);
 }
+
 </script>
 </body>
 </html>
