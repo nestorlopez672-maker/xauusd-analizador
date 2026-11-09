@@ -1,0 +1,14 @@
+
+name: Alertas XAUUSD
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prueba:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comprobar monitor
+        run: |
+          echo "Monitor XAUUSD iniciado"
+          echo "Prueba de GitHub Actions correcta"
