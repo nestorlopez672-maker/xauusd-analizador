@@ -1,7 +1,6 @@
 
-          
 
-name:Alertas XAUUSD
+name: Alertas XAUUSD
 
 on:
   workflow_dispatch:
@@ -17,6 +16,6 @@ jobs:
         run: |
           curl --fail-with-body --silent --show-error \
             --request POST \
-                      "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${CHAT_ID}" \
-            --data-urlencode "text=Prueba exitosa: monitor XAUUSD conectado a Telegram. No es una señal de trading."
+            --data-urlencode "text=Prueba exitosa: monitor XAUUSD conectado a Telegram."
