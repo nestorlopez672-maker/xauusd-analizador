@@ -1,4 +1,6 @@
 
+          
+
 name: Alertas XAUUSD
 
 on:
@@ -8,8 +10,13 @@ jobs:
   prueba:
     runs-on: ubuntu-latest
     steps:
-      - name: Comprobar monitor
+      - name: Enviar mensaje de prueba
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "Monitor XAUUSD iniciado"
-          echo "Prueba correcta"
-          
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text=Prueba exitosa: monitor XAUUSD conectado a Telegram. No es una señal de trading."
